@@ -24,6 +24,7 @@ async def get_all_products(
         page_size: int = Query(20, ge=1, le=100),
         category_id: int | None = Query(
             None, description="ID категории для фильтрации"),
+        search: str | None = Query(None, min_length=1, description="Поиск по названию/описанию"),
         min_price: float | None = Query(
             None, ge=0, description="Минимальная цена товара"),
         max_price: float | None = Query(
@@ -47,6 +48,7 @@ async def get_all_products(
                                                 page=page,
                                                 page_size=page_size,
                                                 category_id=category_id,
+                                                search=search,
                                                 min_price=min_price,
                                                 max_price=max_price,
                                                 in_stock=in_stock,

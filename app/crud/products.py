@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Sequence
 
@@ -28,10 +28,11 @@ async def get_products_pagination(
         page: int,
         page_size: int,
         category_id: int | None = None,
+        search: str | None = None,
         min_price: float | None = None,
         max_price: float | None = None,
         in_stock: bool | None = None,
-        seller_id: int | None = None) -> Sequence[ProductModel]:
+        seller_id: int | None = None) -> dict:
     filters = [ProductModel.is_active == True]
 
     if category_id is not None:
@@ -48,16 +49,37 @@ async def get_products_pagination(
     total_products_stmt = (select(func.count())
                            .select_from(ProductModel)
                            .where(*filters))
+
+    rank_col = None
+    if search:
+        search_value = search.strip()
+        if search_value:
+            ts_query = func.websearch_to_tsquery('english', search_value)
+            filters.append(ProductModel.tsv.op('@@')(ts_query))
+            rank_col = func.ts_rank_cd(ProductModel.tsv, ts_query).label("rank")
+            total_products_stmt = select(func.count()).select_from(ProductModel).where(*filters)
+
     total_products = await db_session.scalar(total_products_stmt) or 0
 
-    products_stmt = (
-        select(ProductModel)
-        .where(*filters)
-        .order_by(ProductModel.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
-    products = (await db_session.scalars(products_stmt)).all()
+    if rank_col is not None:
+        products_stmt = (
+            select(ProductModel, rank_col)
+            .where(*filters)
+            .order_by(desc(rank_col), ProductModel.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        rows = (await db_session.execute(products_stmt)).all()
+        products = [row[0] for row in rows]
+    else:
+        products_stmt = (
+            select(ProductModel)
+            .where(*filters)
+            .order_by(ProductModel.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        products = (await db_session.scalars(products_stmt)).all()
 
     return {
         "items": products,
