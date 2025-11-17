@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import categories, products, users, reviews, cart
+from app.routers import categories, products, users, reviews, cart, orders
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -16,6 +16,7 @@ app.include_router(products.router)
 app.include_router(users.router)
 app.include_router(reviews.router)
 app.include_router(cart.router)
+app.include_router(orders.router)
 
 app.add_middleware(
     CORSMiddleware,

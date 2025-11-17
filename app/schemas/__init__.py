@@ -3,6 +3,7 @@ from .products import Product, ProductCreate, ProductList
 from .users import User, UserCreate
 from .reviews import Review, ReviewCreate
 from .carts import Cart, CartItem, CartItemCreate, CartItemUpdate
+from .orders import Order, OrderItem, OrderList
 
 __all__ = ['Category',
            'CategoryCreate',
@@ -16,4 +17,7 @@ __all__ = ['Category',
            'Cart',
            'CartItem',
            'CartItemCreate',
-           'CartItemUpdate']
+           'CartItemUpdate',
+           'Order',
+           'OrderItem',
+           'OrderList']
