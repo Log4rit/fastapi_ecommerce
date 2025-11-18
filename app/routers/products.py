@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.session import get_async_db
-
 from app.crud import get_product_by_id, get_category_by_id, get_products, get_products_pagination
-
 from app.models.products import Product as ProductModel
 from app.models.users import User as UserModel
 
 from app.schemas import Product as ProductSchema, ProductCreate, ProductList
+
 from app.auth import get_current_seller
+
+from app.services import save_product_image, remove_product_image
+
 
 router = APIRouter(
     prefix="/products",
@@ -87,7 +89,8 @@ async def get_products_by_category(category_id: int, db: AsyncSession = Depends(
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
 async def create_product(
-        product: ProductCreate,
+        product: ProductCreate = Depends(ProductCreate.as_form),
+        image: UploadFile | None = File(None),
         db: AsyncSession = Depends(get_async_db),
         current_user: UserModel = Depends(get_current_seller)
 ):
@@ -98,7 +101,13 @@ async def create_product(
     if not db_category:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category not found or inactive")
 
-    db_product = ProductModel(**product.model_dump(), seller_id=current_user.id)
+    image_url = await save_product_image(image) if image else None
+
+    db_product = ProductModel(
+        **product.model_dump(),
+        seller_id=current_user.id,
+        image_url=image_url,
+    )
     db.add(db_product)
     await db.commit()
     await db.refresh(db_product)
@@ -109,7 +118,8 @@ async def create_product(
 @router.put("/{product_id}", response_model=ProductSchema)
 async def update_product(
         product_id: int,
-        product: ProductCreate,
+        product: ProductCreate = Depends(ProductCreate.as_form),
+        image: UploadFile | None = File(None),
         db: AsyncSession = Depends(get_async_db),
         current_user: UserModel = Depends(get_current_seller)
 ):
@@ -131,6 +141,11 @@ async def update_product(
         .where(ProductModel.id == product_id)
         .values(**product.model_dump())
     )
+
+    if image:
+        remove_product_image(db_product.image_url)
+        db_product.image_url = await save_product_image(image)
+
     await db.commit()
     await db.refresh(db_product)
 
@@ -153,6 +168,8 @@ async def delete_product(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own products")
 
     db_product.is_active = False
+    remove_product_image(db_product.image_url)
+
     await db.commit()
     await db.refresh(db_product)
 
