@@ -19,8 +19,10 @@ services:
     image: postgres:15
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    env_file:
-      - .env
+    environment:
+      - POSTGRES_USER=ecommerce_user
+      - POSTGRES_PASSWORD=logarit
+      - POSTGRES_DB=ecommerce_db
 
   nginx:
     build: nginx
